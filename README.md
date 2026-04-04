@@ -19,7 +19,7 @@ Verify the installation:
 
 ```powershell
 python --version
-pip --version
+python -m pip --version
 ```
 
 ### Git
@@ -57,13 +57,13 @@ VS Code is optional for running the manager, but required for the `Open in code 
 Install the manager runtime dependencies:
 
 ```powershell
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
 Install the automation framework used by generated macro scripts:
 
 ```powershell
-pip install --upgrade --force-reinstall git+https://github.com/diogojesusdev/DesktopMacroFramework
+python -m pip install --upgrade --force-reinstall git+https://github.com/diogojesusdev/DesktopMacroFramework
 ```
 
 ## Run

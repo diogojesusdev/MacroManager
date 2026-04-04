@@ -24,6 +24,20 @@ CODE_EDITOR_PATH = sys.argv[1] if len(sys.argv) > 1 else "code"
 PYTHON_FRAMEWORK_NAME = "DesktopAutomationFramework"
 PythonFrameworkGithubVersionFile = "https://raw.githubusercontent.com/48302-DiogoJesus/DesktopMacroFramework/main/version.txt"
 
+def _normalize_path(path: str) -> str:
+	return os.path.normcase(os.path.normpath(path))
+
+def _get_repo_path() -> str:
+	return BASE_DIR.replace('\\', '/')
+
+def _run_pip_command(*args: str) -> subprocess.CompletedProcess[str]:
+	return subprocess.run(
+		[sys.executable, "-m", "pip", *args],
+		check=False,
+		capture_output=True,
+		text=True
+	)
+
 def _get_pythonw_executable() -> str:
 	pythonw_path = shutil.which("pythonw")
 	if pythonw_path:
@@ -39,10 +53,28 @@ def _get_pythonw_executable() -> str:
 def _open_with_default_application(path: str) -> None:
 	os.startfile(path)
 
+def _schedule_manager_restart() -> None:
+	run_script = os.path.join(BASE_DIR, "installers", "Run.vbs")
+	command = f'ping 127.0.0.1 -n 3 >nul && cscript //B "{run_script}"'
+	creation_flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+	subprocess.Popen(["cmd", "/c", command], creationflags=creation_flags)
+
 def create_environment_if_not_exists():
 	# Without this, it's not possible to do "git rev-parse HEAD" to check versions if this is installed on an external device (e.g., pendrive)
-	p = os.path.abspath('.').replace('\\', '/')
-	subprocess.run(["git", "config", "--global", "--add", "safe.directory", p], check=False)
+	repo_path = _get_repo_path()
+	existing_safe_directories = subprocess.run(
+		["git", "config", "--global", "--get-all", "safe.directory"],
+		check=False,
+		capture_output=True,
+		text=True
+	)
+	configured_paths = {
+		_normalize_path(path.replace('\\', '/'))
+		for path in existing_safe_directories.stdout.splitlines()
+		if path.strip()
+	}
+	if _normalize_path(repo_path) not in configured_paths:
+		subprocess.run(["git", "config", "--global", "--add", "safe.directory", repo_path], check=False)
  
 	os.makedirs(MACROS_BASE_PATH, exist_ok=True)
 
@@ -239,16 +271,15 @@ class MacroManager:
 		remote_version_stdout, _ = remote_version_process.communicate()
 		remote_version = remote_version_stdout.decode().strip()
 
-		current_version_command = f'pip show {PYTHON_FRAMEWORK_NAME}'
-		current_version_process = subprocess.Popen(current_version_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		current_version_stdout, _ = current_version_process.communicate()
-		current_version_output = current_version_stdout.decode().strip()
+		current_version_process = _run_pip_command("show", PYTHON_FRAMEWORK_NAME)
+		current_version_output = current_version_process.stdout.strip()
 		version_match = re.search(r'Version: (.+)', current_version_output)
 		current_version = (version_match.group(1) if version_match else "").strip()
+		framework_installed = current_version != ""
   
 		return Versions(
 			# Determine if update is needed
-		  	should_update=current_version != remote_version if current_version != "" else False,
+		  	should_update=(not framework_installed) or (remote_version != "" and current_version != remote_version),
 		  	current_version=current_version,
 		  	remote_version=remote_version
 	  	)
@@ -270,10 +301,13 @@ class MacroManager:
 
 	@staticmethod
 	def update_framework() -> None:
-		command = f"pip install --upgrade --force-reinstall git+https://github.com/diogojesusdev/DesktopMacroFramework"
-		process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		stdout, stderr = process.communicate()
-		print(f"update_framework() => {stdout.decode().strip()}")
+		process = _run_pip_command(
+			"install",
+			"--upgrade",
+			"--force-reinstall",
+			"git+https://github.com/diogojesusdev/DesktopMacroFramework"
+		)
+		print(f"update_framework() => {process.stdout.strip()}")
 		returncode = process.returncode
 		if returncode != 0:
 			raise RuntimeError(f"Error updating framework. Command returned non-zero exit code {returncode}.")
@@ -289,5 +323,5 @@ class MacroManager:
 			raise RuntimeError(f"Error updating manager. Command returned non-zero exit code {returncode}.")
 
 		# Restart the manager with the new code version
-		_open_with_default_application(os.path.join(BASE_DIR, "installers", "Run.vbs"))
-		exit()
+		_schedule_manager_restart()
+		raise SystemExit()
