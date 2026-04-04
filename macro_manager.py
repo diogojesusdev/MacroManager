@@ -8,26 +8,41 @@ import subprocess
 import sys
 from typing import Optional
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 home_dir = os.path.expanduser("~")
 
 # Join the home directory with "MacroManager" to form the full path
 MACROS_BASE_PATH = os.path.join(home_dir, "MacroManager")
 MACRO_TEMPLATE_SCRIPT_NAME = 'macro_template.py'
-MACRO_TEMPLATE_SCRIPT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "code_templates", MACRO_TEMPLATE_SCRIPT_NAME)
+MACRO_TEMPLATE_SCRIPT_PATH = os.path.join(BASE_DIR, "code_templates", MACRO_TEMPLATE_SCRIPT_NAME)
 MACRO_TEMPLATE_SCRIPT_DESTINATION_PATH = os.path.join(MACROS_BASE_PATH, MACRO_TEMPLATE_SCRIPT_NAME)
 
 DEFAULT_MACRO_NAME = "macro.py"
-VSCODE_CONFIG_FOLDER_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".vscode")
-DEFAULT_MACRO_SCRIPT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "code_templates", DEFAULT_MACRO_NAME)
+VSCODE_CONFIG_FOLDER_PATH = os.path.join(BASE_DIR, ".vscode")
+DEFAULT_MACRO_SCRIPT_PATH = os.path.join(BASE_DIR, "code_templates", DEFAULT_MACRO_NAME)
 CODE_EDITOR_PATH = sys.argv[1] if len(sys.argv) > 1 else "code"
 PYTHON_FRAMEWORK_NAME = "DesktopAutomationFramework"
 PythonFrameworkGithubVersionFile = "https://raw.githubusercontent.com/48302-DiogoJesus/DesktopMacroFramework/main/version.txt"
 
+def _get_pythonw_executable() -> str:
+	pythonw_path = shutil.which("pythonw")
+	if pythonw_path:
+		return pythonw_path
+
+	python_dir = os.path.dirname(os.path.abspath(sys.executable))
+	pythonw_candidate = os.path.join(python_dir, "pythonw.exe")
+	if os.path.exists(pythonw_candidate):
+		return pythonw_candidate
+
+	return sys.executable
+
+def _open_with_default_application(path: str) -> None:
+	os.startfile(path)
+
 def create_environment_if_not_exists():
 	# Without this, it's not possible to do "git rev-parse HEAD" to check versions if this is installed on an external device (e.g., pendrive)
 	p = os.path.abspath('.').replace('\\', '/')
-	cmd = f"git config --global --add safe.directory {p}"
-	os.system(cmd)
+	subprocess.run(["git", "config", "--global", "--add", "safe.directory", p], check=False)
  
 	os.makedirs(MACROS_BASE_PATH, exist_ok=True)
 
@@ -69,39 +84,35 @@ class MacroManager:
 		os.makedirs(folderFullPath)
 		# Copy macro template script to macro folder
 		shutil.copy(DEFAULT_MACRO_SCRIPT_PATH, pythonFilePath)
-  
-		try:
-			shutil.copytree(VSCODE_CONFIG_FOLDER_PATH, os.path.join(folderFullPath, ".vscode"))
-		except Exception as e:
-			print("MREDE", e)
+		shutil.copytree(VSCODE_CONFIG_FOLDER_PATH, os.path.join(folderFullPath, ".vscode"))
 		
 		return pythonFilePath
 
 	@staticmethod
 	def open_macros_folder() -> None:
-		os.system('explorer "' + MACROS_BASE_PATH + "\"")
+		_open_with_default_application(MACROS_BASE_PATH)
 			
 	@staticmethod
 	def open_macro_in_code_editor(absolute_macro_path: str) -> None:
 		create_environment_if_not_exists()
 		print(absolute_macro_path)
-		os.system(f'{CODE_EDITOR_PATH} "' + os.path.dirname(absolute_macro_path) + "\"")
+		subprocess.Popen([CODE_EDITOR_PATH, os.path.dirname(absolute_macro_path)])
 	
 	@staticmethod
 	def open_macro_in_file_explorer(absolute_macro_path: str) -> None:
 		create_environment_if_not_exists()
-		os.system('explorer "' + os.path.dirname(absolute_macro_path) + "\"")
+		_open_with_default_application(os.path.dirname(absolute_macro_path))
 		
 	@staticmethod 
 	def open_task_scheduler() -> None:
 		create_environment_if_not_exists()
-		os.system('taskschd.msc')
+		_open_with_default_application("taskschd.msc")
 	
 	@staticmethod
 	def open_macro_template() -> None:
 		create_environment_if_not_exists()
 		create_environment_if_not_exists()
-		os.system(f'{CODE_EDITOR_PATH} "' + MACRO_TEMPLATE_SCRIPT_DESTINATION_PATH + "\"")
+		subprocess.Popen([CODE_EDITOR_PATH, MACRO_TEMPLATE_SCRIPT_DESTINATION_PATH])
 	
 	@staticmethod
 	def get_macros_flat() -> list[Macro]:
@@ -211,16 +222,16 @@ class MacroManager:
   		exit_after_run: bool = False
 	) -> None:
 		create_environment_if_not_exists()
-		key_value_pairs = " ".join([f'{key}="{value}"' for key, value in invocation_variables.items()])
-		command = f'pythonw "{absolute_macro_path}" {key_value_pairs}'
+		command = [_get_pythonw_executable(), absolute_macro_path]
+		command.extend([f'{key}={value}' for key, value in invocation_variables.items()])
 		if time_between_instructions_s:
-			command += f' --interval_s={time_between_instructions_s}'
+			command.append(f'--interval_s={time_between_instructions_s}')
 		if auto_run:
-			command += ' --auto-run'
+			command.append('--auto-run')
 		if exit_after_run:
-			command += ' --exit-after-run'
+			command.append('--exit-after-run')
 	
-		os.system(command)
+		subprocess.run(command, check=False)
 
 	@staticmethod
 	def get_framework_versions() -> Versions:
@@ -260,7 +271,7 @@ class MacroManager:
 
 	@staticmethod
 	def update_framework() -> None:
-		command = f"pip install --upgrade --force-reinstall git+https://github.com/48302-DiogoJesus/DesktopMacroFramework"
+		command = f"pip install --upgrade --force-reinstall git+https://github.com/diogojesusdev/DesktopMacroFramework"
 		process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		stdout, stderr = process.communicate()
 		print(f"update_framework() => {stdout.decode().strip()}")
@@ -279,5 +290,5 @@ class MacroManager:
 			raise RuntimeError(f"Error updating manager. Command returned non-zero exit code {returncode}.")
 
 		# Restart the manager with the new code version
-		os.system("installers\\MacroManagerRun.vbs")
+		_open_with_default_application(os.path.join(BASE_DIR, "installers", "Run.vbs"))
 		exit()
