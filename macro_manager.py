@@ -128,7 +128,10 @@ class MacroManager:
 	def open_macro_in_code_editor(absolute_macro_path: str) -> None:
 		create_environment_if_not_exists()
 		print(absolute_macro_path)
-		subprocess.Popen([CODE_EDITOR_PATH, os.path.dirname(absolute_macro_path)])
+		folder_path = os.path.dirname(absolute_macro_path)
+		if not os.path.isdir(folder_path):
+			raise FileNotFoundError(f"Could not find macro folder at {folder_path}")
+		subprocess.Popen([CODE_EDITOR_PATH, folder_path])
 	
 	@staticmethod
 	def open_macro_in_file_explorer(absolute_macro_path: str) -> None:
