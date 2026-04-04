@@ -78,6 +78,8 @@ The application serves the UI on `http://localhost:8181`.
 
 On first run, the manager creates a `MacroManager` directory in your user home folder and copies the default macro template there.
 
+Backend logs are written to `macro_manager.log` in the repository root. Each entry includes a timestamp, log level, logger name, and message.
+
 ## Optional Startup Installation
 
 To register the manager to run at Windows logon, run:

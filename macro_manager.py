@@ -1,6 +1,7 @@
 import ast
 from dataclasses import dataclass
 from datetime import datetime
+import logging
 import os
 import re
 import shutil
@@ -23,6 +24,7 @@ DEFAULT_MACRO_SCRIPT_PATH = os.path.join(BASE_DIR, "code_templates", DEFAULT_MAC
 CODE_EDITOR_PATH = sys.argv[1] if len(sys.argv) > 1 else "code"
 PYTHON_FRAMEWORK_NAME = "DesktopAutomationFramework"
 PythonFrameworkGithubVersionFile = "https://raw.githubusercontent.com/48302-DiogoJesus/DesktopMacroFramework/main/version.txt"
+logger = logging.getLogger(__name__)
 
 def _normalize_path(path: str) -> str:
 	return os.path.normcase(os.path.normpath(path))
@@ -146,10 +148,12 @@ def _copy_macro_vscode_config(destination_folder_path: str) -> None:
 
 	if not os.path.exists(destination_vscode_path):
 		shutil.copytree(VSCODE_CONFIG_FOLDER_PATH, destination_vscode_path)
+		logger.info("Created editor config for macro folder: %s", destination_folder_path)
 		return
 
 	if os.path.exists(source_settings_path) and not os.path.exists(destination_settings_path):
 		shutil.copy2(source_settings_path, destination_settings_path)
+		logger.info("Added missing settings.json for macro folder: %s", destination_folder_path)
 
 def _iter_macro_directories() -> set[str]:
 	macro_directories: set[str] = set()
@@ -195,11 +199,12 @@ def create_environment_if_not_exists():
 
 	if not os.path.exists(MACRO_TEMPLATE_SCRIPT_DESTINATION_PATH):
 		shutil.copy(MACRO_TEMPLATE_SCRIPT_PATH, MACRO_TEMPLATE_SCRIPT_DESTINATION_PATH)
+		logger.info("Created shared macro template at %s", MACRO_TEMPLATE_SCRIPT_DESTINATION_PATH)
 
 	for macro_directory in _iter_macro_directories():
 		_copy_macro_vscode_config(macro_directory)
 	
-	print("Environment created successfully...")
+	logger.info("Environment check completed")
 
 @dataclass
 class Macro:
@@ -245,7 +250,7 @@ class MacroManager:
 	@staticmethod
 	def open_macro_in_code_editor(absolute_macro_path: str) -> None:
 		create_environment_if_not_exists()
-		print(absolute_macro_path)
+		logger.info("Opening macro in code editor: %s", absolute_macro_path)
 		folder_path = os.path.dirname(absolute_macro_path)
 		if not os.path.isdir(folder_path):
 			raise FileNotFoundError(f"Could not find macro folder at {folder_path}")
@@ -310,7 +315,7 @@ class MacroManager:
 			search(MACROS_BASE_PATH)
 			return [file for file in file_list if file.path != MACRO_TEMPLATE_SCRIPT_DESTINATION_PATH]
 		except Exception as e:
-			print(f'Error searching Python files: {e}')
+			logger.exception("Error searching Python files")
 			return []
 		
 	@staticmethod
@@ -428,9 +433,12 @@ class MacroManager:
 			"--force-reinstall",
 			"git+https://github.com/diogojesusdev/DesktopMacroFramework"
 		)
-		print(f"update_framework() => {process.stdout.strip()}")
+		logger.info("update_framework() stdout: %s", process.stdout.strip())
+		if process.stderr.strip():
+			logger.warning("update_framework() stderr: %s", process.stderr.strip())
 		returncode = process.returncode
 		if returncode != 0:
+			logger.error("Error updating framework. Command returned non-zero exit code %s.", returncode)
 			raise RuntimeError(f"Error updating framework. Command returned non-zero exit code {returncode}.")
 
 	@staticmethod
@@ -438,9 +446,14 @@ class MacroManager:
 		command = "git fetch origin && git reset --hard origin/main && git clean -fd"
 		process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		stdout, stderr = process.communicate()
-		print(f"update_manager() => {stdout.decode().strip()}")
+		decoded_stdout = stdout.decode().strip()
+		decoded_stderr = stderr.decode().strip()
+		logger.info("update_manager() stdout: %s", decoded_stdout)
+		if decoded_stderr:
+			logger.warning("update_manager() stderr: %s", decoded_stderr)
 		returncode = process.returncode
 		if returncode != 0:
+			logger.error("Error updating manager. Command returned non-zero exit code %s.", returncode)
 			raise RuntimeError(f"Error updating manager. Command returned non-zero exit code {returncode}.")
 
 		# Restart the manager with the new code version
