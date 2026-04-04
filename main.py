@@ -49,7 +49,7 @@ if __name__ == '__main__':
 	try:
 		iface = TypeScriptInterfaceGenerator.generate_typescript_interface_to_file(
 			class_obj=macro_manager.MacroManager,
-			out_file_path="../frontend/src/lib/types/IMacroManager.ts"
+			out_file_path="./frontend/src/lib/types/IMacroManager.ts"
 		)
 		print("IMacroManager.ts generated successfully...")
 	except Exception as ex:

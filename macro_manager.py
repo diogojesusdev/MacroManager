@@ -53,6 +53,86 @@ def _get_pythonw_executable() -> str:
 def _open_with_default_application(path: str) -> None:
 	os.startfile(path)
 
+def _open_directory_in_file_explorer(path: str, focus_window: bool = False) -> None:
+	absolute_path = os.path.abspath(path)
+	if os.name != "nt":
+		_open_with_default_application(absolute_path)
+		return
+
+	creation_flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+	subprocess.Popen(["explorer.exe", absolute_path], creationflags=creation_flags)
+	if not focus_window:
+		return
+
+	escaped_path = absolute_path.replace("'", "''")
+	command = f"""
+Add-Type @\"
+using System;
+using System.Runtime.InteropServices;
+public static class User32 {{
+	public static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+	public static readonly IntPtr HWND_NOTOPMOST = new IntPtr(-2);
+
+	[DllImport(\"user32.dll\")]
+	public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
+
+	[DllImport(\"user32.dll\")]
+	public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+	[DllImport(\"user32.dll\")]
+	public static extern bool BringWindowToTop(IntPtr hWnd);
+
+	[DllImport(\"user32.dll\")]
+	public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+	[DllImport(\"user32.dll\")]
+	public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+}}
+\"@
+
+$targetPath = [System.IO.Path]::GetFullPath('{escaped_path}')
+$deadline = (Get-Date).AddSeconds(2)
+
+do {{
+	$shell = New-Object -ComObject Shell.Application
+	$window = $null
+
+	foreach ($candidate in $shell.Windows()) {{
+		try {{
+			$candidatePath = [System.IO.Path]::GetFullPath($candidate.Document.Folder.Self.Path)
+			if ($candidatePath -eq $targetPath) {{
+				$window = $candidate
+				break
+			}}
+		}} catch {{
+		}}
+	}}
+
+	if ($window -ne $null) {{
+		$hwnd = [IntPtr]::new([int64]$window.HWND)
+		# ALT keypress is a standard workaround for Windows foreground-lock restrictions.
+		[User32]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero)
+		[User32]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)
+		[User32]::ShowWindowAsync($hwnd, 9) | Out-Null
+		[User32]::BringWindowToTop($hwnd) | Out-Null
+		[User32]::SetWindowPos($hwnd, [User32]::HWND_TOPMOST, 0, 0, 0, 0, 0x0001 -bor 0x0002) | Out-Null
+		[User32]::SetWindowPos($hwnd, [User32]::HWND_NOTOPMOST, 0, 0, 0, 0, 0x0001 -bor 0x0002) | Out-Null
+		[User32]::SetForegroundWindow($hwnd) | Out-Null
+		break
+	}}
+
+	Start-Sleep -Milliseconds 100
+}} while ((Get-Date) -lt $deadline)
+"""
+
+	subprocess.run(
+		["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command],
+		check=False,
+		capture_output=True,
+		text=True,
+		creationflags=creation_flags,
+	)
+
 def _schedule_manager_restart() -> None:
 	run_script = os.path.join(BASE_DIR, "installers", "Run.vbs")
 	command = f'ping 127.0.0.1 -n 3 >nul && cscript //B "{run_script}"'
@@ -122,7 +202,7 @@ class MacroManager:
 
 	@staticmethod
 	def open_macros_folder() -> None:
-		_open_with_default_application(MACROS_BASE_PATH)
+		_open_directory_in_file_explorer(MACROS_BASE_PATH, focus_window=True)
 			
 	@staticmethod
 	def open_macro_in_code_editor(absolute_macro_path: str) -> None:
@@ -136,7 +216,7 @@ class MacroManager:
 	@staticmethod
 	def open_macro_in_file_explorer(absolute_macro_path: str) -> None:
 		create_environment_if_not_exists()
-		_open_with_default_application(os.path.dirname(absolute_macro_path))
+		_open_directory_in_file_explorer(os.path.dirname(absolute_macro_path), focus_window=True)
 		
 	@staticmethod 
 	def open_task_scheduler() -> None:
