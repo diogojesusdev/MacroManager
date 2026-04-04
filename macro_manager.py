@@ -111,7 +111,6 @@ class MacroManager:
 	@staticmethod
 	def open_macro_template() -> None:
 		create_environment_if_not_exists()
-		create_environment_if_not_exists()
 		subprocess.Popen([CODE_EDITOR_PATH, MACRO_TEMPLATE_SCRIPT_DESTINATION_PATH])
 	
 	@staticmethod

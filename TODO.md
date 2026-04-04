@@ -1,16 +1,5 @@
-# Changes Required
-- os.system() is deprecated
-- crete readme with requirements and install instructions
-- do AI code review (push first)
-
-
-# Remote Operations
-- Uninstall NodeJS (inside appdata)
-- Remove regentry: HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run
-- Clean Install
-  - take only installers\Installer - MacroManager.bat inside a pendrive 
-  - run installers\Installer - MacroManager.bat
-  - Create Chrome bookmark for http://localhost:8181
-
-# Requirements
-- git installed (only for easier updates to the 2 app parts)
+- ensure the macromanager is only accessible on the local computer and not on other pcs
+- apply your create_environment git fix
+- keep using python the same way but all pip installs should use "python -m pip" instead of just "pip"
+- apply your fix for the DesktopAutomationFramework installation "no update needed"
+- apply your last fix (point 5)
