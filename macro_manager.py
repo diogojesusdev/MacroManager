@@ -139,6 +139,41 @@ def _schedule_manager_restart() -> None:
 	creation_flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 	subprocess.Popen(["cmd", "/c", command], creationflags=creation_flags)
 
+def _copy_macro_vscode_config(destination_folder_path: str) -> None:
+	destination_vscode_path = os.path.join(destination_folder_path, ".vscode")
+	source_settings_path = os.path.join(VSCODE_CONFIG_FOLDER_PATH, "settings.json")
+	destination_settings_path = os.path.join(destination_vscode_path, "settings.json")
+
+	if not os.path.exists(destination_vscode_path):
+		shutil.copytree(VSCODE_CONFIG_FOLDER_PATH, destination_vscode_path)
+		return
+
+	if os.path.exists(source_settings_path) and not os.path.exists(destination_settings_path):
+		shutil.copy2(source_settings_path, destination_settings_path)
+
+def _iter_macro_directories() -> set[str]:
+	macro_directories: set[str] = set()
+	if not os.path.isdir(MACROS_BASE_PATH):
+		return macro_directories
+
+	for current_directory, _, files in os.walk(MACROS_BASE_PATH):
+		for file_name in files:
+			if not file_name.endswith('.py'):
+				continue
+
+			file_path = os.path.join(current_directory, file_name)
+			try:
+				with open(file_path, 'r', encoding='utf-8') as file:
+					file_contents = file.read()
+			except OSError:
+				continue
+
+			if '@Macro' in file_contents and file_path != MACRO_TEMPLATE_SCRIPT_DESTINATION_PATH:
+				macro_directories.add(current_directory)
+				break
+
+	return macro_directories
+
 def create_environment_if_not_exists():
 	# Without this, it's not possible to do "git rev-parse HEAD" to check versions if this is installed on an external device (e.g., pendrive)
 	repo_path = _get_repo_path()
@@ -160,6 +195,9 @@ def create_environment_if_not_exists():
 
 	if not os.path.exists(MACRO_TEMPLATE_SCRIPT_DESTINATION_PATH):
 		shutil.copy(MACRO_TEMPLATE_SCRIPT_PATH, MACRO_TEMPLATE_SCRIPT_DESTINATION_PATH)
+
+	for macro_directory in _iter_macro_directories():
+		_copy_macro_vscode_config(macro_directory)
 	
 	print("Environment created successfully...")
 
@@ -196,7 +234,7 @@ class MacroManager:
 		os.makedirs(folderFullPath)
 		# Copy macro template script to macro folder
 		shutil.copy(DEFAULT_MACRO_SCRIPT_PATH, pythonFilePath)
-		shutil.copytree(VSCODE_CONFIG_FOLDER_PATH, os.path.join(folderFullPath, ".vscode"))
+		_copy_macro_vscode_config(folderFullPath)
 		
 		return pythonFilePath
 

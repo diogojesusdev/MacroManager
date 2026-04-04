@@ -1,5 +1,0 @@
-- ensure the macromanager is only accessible on the local computer and not on other pcs
-- apply your create_environment git fix
-- keep using python the same way but all pip installs should use "python -m pip" instead of just "pip"
-- apply your fix for the DesktopAutomationFramework installation "no update needed"
-- apply your last fix (point 5)
