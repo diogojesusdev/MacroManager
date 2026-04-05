@@ -21,7 +21,7 @@ MACRO_TEMPLATE_SCRIPT_DESTINATION_PATH = os.path.join(MACROS_BASE_PATH, MACRO_TE
 DEFAULT_MACRO_NAME = "macro.py"
 VSCODE_CONFIG_FOLDER_PATH = os.path.join(BASE_DIR, ".vscode")
 DEFAULT_MACRO_SCRIPT_PATH = os.path.join(BASE_DIR, "code_templates", DEFAULT_MACRO_NAME)
-CODE_EDITOR_PATH = sys.argv[1] if len(sys.argv) > 1 else "code"
+CODE_EDITOR_PATH = "code"
 PYTHON_FRAMEWORK_NAME = "DesktopAutomationFramework"
 PythonFrameworkGithubVersionFile = "https://raw.githubusercontent.com/48302-DiogoJesus/DesktopMacroFramework/main/version.txt"
 logger = logging.getLogger(__name__)
@@ -254,7 +254,7 @@ class MacroManager:
 		folder_path = os.path.dirname(absolute_macro_path)
 		if not os.path.isdir(folder_path):
 			raise FileNotFoundError(f"Could not find macro folder at {folder_path}")
-		subprocess.Popen([CODE_EDITOR_PATH, folder_path])
+		subprocess.Popen([CODE_EDITOR_PATH, folder_path], shell=True)
 	
 	@staticmethod
 	def open_macro_in_file_explorer(absolute_macro_path: str) -> None:
